@@ -5,7 +5,6 @@ const cors = require('cors');
 
 const app = express();
 app.use(cors());
-// 🔥 IMPORTANT FIX: Increased limit to 50mb so backup files don't get blocked
 app.use(express.json({ limit: '50mb' })); 
 
 // 🔐 TERE CREDENTIALS
@@ -17,10 +16,13 @@ const transporter = nodemailer.createTransport({
   auth: { user: MY_GMAIL, pass: APP_PASSWORD }
 });
 
-// 🔥 IN-MEMORY OTP STORE (5 Min Expiry)
+// 🔥 UPTIMEROBOT PING ROUTE (Ye 404 error fix karega!)
+app.get('/', (req, res) => {
+  res.status(200).send('SafeLocker Cloud Engine is ALIVE! 🚀');
+});
+
 const otpStore = new Map();
 
-// 🧠 CONTEXT-BASED EMAIL TEMPLATE ENGINE (For OTPs)
 const getEmailTemplateContent = (type, otp) => {
   let title = "Verify Your Email";
   let message = "Use this 6-digit OTP to verify your SafeLocker recovery email. It expires in 5 minutes.";
@@ -50,7 +52,6 @@ const getEmailTemplateContent = (type, otp) => {
       break;
   }
 
-  // 🎨 Premium OTP Email Design
   const html = `
   <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; padding: 40px 20px; text-align: center; background: #FAFAFB;">
     <div style="max-width: 90%; margin: auto; background: #F9FAFB; padding: 32px 20px; border-radius: 16px; border: 1px solid #E5E7EB; box-shadow: 0 10px 25px rgba(0,0,0,0.05);">
@@ -69,7 +70,6 @@ const getEmailTemplateContent = (type, otp) => {
   return { subject, html };
 };
 
-// 🔥 1. SEND OTP ROUTE
 app.post('/send-otp', async (req, res) => {
   const { email, otpType } = req.body; 
   if (!email) return res.status(400).json({ success: false, message: 'Email is required' });
@@ -91,7 +91,6 @@ app.post('/send-otp', async (req, res) => {
   }
 });
 
-// 🔥 2. VERIFY OTP ROUTE
 app.post('/verify-otp', (req, res) => {
   const { email, otp } = req.body;
   const record = otpStore.get(email);
@@ -109,7 +108,6 @@ app.post('/verify-otp', (req, res) => {
   res.status(400).json({ success: false, message: 'Invalid OTP.' });
 });
 
-// 🔥 3. SEND SECURITY ALERT ROUTE
 app.post('/send-alert', async (req, res) => {
   const { email, subject, message } = req.body;
   if (!email || !subject || !message) return res.status(400).json({ success: false, message: 'Email, subject and message are required' });
@@ -138,9 +136,6 @@ app.post('/send-alert', async (req, res) => {
   }
 });
 
-// =========================================================
-// 🔥 4. PREMIUM CLOUD BACKUP DELIVERY ROUTE (ATTACHMENT)
-// =========================================================
 app.post('/send-backup', async (req, res) => {
   const { email, backupData, hint, deviceId } = req.body;
 
@@ -149,10 +144,8 @@ app.post('/send-backup', async (req, res) => {
   }
 
   const date = new Date().toLocaleString();
-  // 🔥 IMPORTANT FIX: Gmail strictly checks extensions. Changed to .json
   const fileName = `SafeLocker_Backup_${Date.now()}.json`;
 
-  // 🎨 Ultra-Premium Email Template
   const backupHtml = `
   <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px 20px; text-align: center; background: #F8F9FB;">
     <div style="max-width: 90%; margin: auto; background: #FFFFFF; padding: 36px 24px; border-radius: 24px; border: 1px solid #EEF1F5; box-shadow: 0 12px 32px rgba(15,23,42,0.05);">
@@ -198,7 +191,7 @@ app.post('/send-backup', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-// Start the server
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Smart Context-Aware Backend running on port ${PORT}`);
 });
+      
