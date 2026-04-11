@@ -7,20 +7,21 @@ const rateLimit = require('express-rate-limit');
 
 const app = express();
 
-// 📡 GLOBAL RADAR: Darwaze pe kon aaya, sabse pehle ye print karega!
+// 🛠️ FIX 1: Trust Render's Proxy (Ye Rate Limiter ko crash hone se rokenge)
+app.set('trust proxy', 1); 
+
+// 📡 GLOBAL RADAR
 app.use((req, res, next) => {
   console.log(`[RADAR] 🚨 Incoming Request: ${req.method} ${req.url} from ${req.ip}`);
   next();
 });
 
-// 🔓 CORS UNLOCKED FOR MOBILE APP
 app.use(cors({ origin: '*' }));
 app.use(express.json({ limit: '50mb' })); 
 
-// Rate Limiter
 const otpLimiter = rateLimit({
   windowMs: 5 * 60 * 1000, 
-  max: 10, // Limit badha di hai development ke liye
+  max: 10, 
   message: { success: false, message: "Too many OTP requests." },
   standardHeaders: true, 
   legacyHeaders: false, 
@@ -29,8 +30,11 @@ const otpLimiter = rateLimit({
 const MY_GMAIL = process.env.EMAIL_USER; 
 const APP_PASSWORD = process.env.EMAIL_PASS; 
 
+// 🛠️ FIX 2: Force IPv4 and SSL for Render (Ye Timeout ko rokega)
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'smtp.gmail.com',
+  port: 465,
+  secure: true, // Use SSL
   auth: { user: MY_GMAIL, pass: APP_PASSWORD }
 });
 
@@ -79,7 +83,7 @@ app.post('/send-otp', otpLimiter, async (req, res) => {
   const template = getEmailTemplateContent(otpType, otp);
   
   try {
-    console.log(`⏳ Sending email via Nodemailer...`);
+    console.log(`⏳ Sending email via Nodemailer (IPv4 Forced)...`);
     await transporter.sendMail({ from: `"SafeLocker Security" <${MY_GMAIL}>`, to: email, subject: template.subject, html: template.html });
     console.log(`✅ [SUCCESS] Email sent to: ${email}`);
     res.status(200).json({ success: true, message: 'OTP sent successfully!' });
@@ -102,4 +106,3 @@ app.post('/verify-otp', (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => console.log(`🚀 RADAR Engine running on port ${PORT}`));
-
