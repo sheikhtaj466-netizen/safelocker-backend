@@ -3,19 +3,25 @@ require('dotenv').config();
 const express = require('express');
 const nodemailer = require('nodemailer');
 const cors = require('cors');
-const helmet = require('helmet'); 
 const rateLimit = require('express-rate-limit'); 
 
 const app = express();
 
-app.use(helmet()); 
-app.use(cors());
+// 📡 GLOBAL RADAR: Darwaze pe kon aaya, sabse pehle ye print karega!
+app.use((req, res, next) => {
+  console.log(`[RADAR] 🚨 Incoming Request: ${req.method} ${req.url} from ${req.ip}`);
+  next();
+});
+
+// 🔓 CORS UNLOCKED FOR MOBILE APP
+app.use(cors({ origin: '*' }));
 app.use(express.json({ limit: '50mb' })); 
 
+// Rate Limiter
 const otpLimiter = rateLimit({
   windowMs: 5 * 60 * 1000, 
-  max: 5, // Thoda limit badha diya development ke liye
-  message: { success: false, message: "Too many OTP requests. Please try again after 5 minutes." },
+  max: 10, // Limit badha di hai development ke liye
+  message: { success: false, message: "Too many OTP requests." },
   standardHeaders: true, 
   legacyHeaders: false, 
 });
@@ -37,46 +43,34 @@ const getEmailTemplateContent = (type, otp) => {
   let message = "Use this 6-digit OTP to verify your SafeLocker recovery email. It expires in 5 minutes.";
   let subject = "SafeLocker: Email Verification OTP";
   let themeColor = "#6C5CE7"; 
-  let bgBox = "#EEF2FF";
 
   if (type === 'VAULT_WIPE') {
     title = "⚠️ URGENT: Vault Reset Requested";
-    message = "Use this 6-digit OTP to authorize a complete wipe of your SafeLocker data.<br><br><b>WARNING:</b> This will permanently delete all local data.";
     subject = "🚨 ALERT: SafeLocker Reset OTP";
     themeColor = "#DC2626"; 
-    bgBox = "#FEF2F2"; 
   } else if (type === 'RESET_MASTER_PIN') {
     title = "Reset Your Vault PIN";
-    message = "Use this 6-digit OTP to reset your SafeLocker master PIN.";
     subject = "SafeLocker: Reset Master PIN";
   }
 
   const html = `
-  <div style="font-family: -apple-system, sans-serif; padding: 40px 20px; text-align: center; background: #FAFAFB;">
+  <div style="font-family: sans-serif; padding: 40px 20px; text-align: center; background: #FAFAFB;">
     <div style="max-width: 90%; margin: auto; background: #FFFFFF; padding: 32px 20px; border-radius: 16px; border: 1px solid #E5E7EB;">
-      <h2 style="color: ${themeColor}; margin-top: 0; font-size: 22px;">${title}</h2>
-      <p style="color: #6B7280; font-size: 15px; margin-bottom: 24px;">${message}</p>
-      <div style="background: ${bgBox}; padding: 14px; border-radius: 12px; margin: 0 auto; max-width: 200px;">
-        <h1 style="letter-spacing: 6px; color: ${themeColor}; margin: 0; font-size: 28px;">${otp}</h1>
-      </div>
+      <h2 style="color: ${themeColor};">${title}</h2>
+      <p style="color: #6B7280; font-size: 15px;">${message}</p>
+      <h1 style="letter-spacing: 6px; color: ${themeColor}; font-size: 28px;">${otp}</h1>
     </div>
   </div>`;
-
   return { subject, html };
 };
 
-// 🔥 X-RAY LOGGING ADDED HERE
 app.post('/send-otp', otpLimiter, async (req, res) => {
   const { email, otpType } = req.body; 
-  console.log(`\n🚀 [OTP REQUEST] Received for: ${email} | Type: ${otpType}`);
+  console.log(`🚀 [ROUTE HIT] Processing OTP for: ${email}`);
 
-  if (!email) {
-    console.log(`❌ [ERROR] Email missing in request.`);
-    return res.status(400).json({ success: false, message: 'Email is required' });
-  }
-  
+  if (!email) return res.status(400).json({ success: false, message: 'Email is required' });
   if (!MY_GMAIL || !APP_PASSWORD) {
-    console.log(`❌ [CRITICAL ERROR] Environment Variables missing! Check Render Dashboard.`);
+    console.log(`❌ [AUTH ERROR] Gmail credentials missing!`);
     return res.status(500).json({ success: false, message: 'Server Email Auth not configured.' });
   }
 
@@ -85,12 +79,12 @@ app.post('/send-otp', otpLimiter, async (req, res) => {
   const template = getEmailTemplateContent(otpType, otp);
   
   try {
-    console.log(`⏳ [SENDING EMAIL] Connecting to Nodemailer...`);
+    console.log(`⏳ Sending email via Nodemailer...`);
     await transporter.sendMail({ from: `"SafeLocker Security" <${MY_GMAIL}>`, to: email, subject: template.subject, html: template.html });
-    console.log(`✅ [SUCCESS] Email delivered successfully to: ${email}`);
+    console.log(`✅ [SUCCESS] Email sent to: ${email}`);
     res.status(200).json({ success: true, message: 'OTP sent successfully!' });
   } catch (error) { 
-    console.error(`❌ [NODEMAILER ERROR] Failed to send email:`, error.message);
+    console.error(`❌ [NODEMAILER ERROR]`, error.message);
     res.status(500).json({ success: false, error: error.message }); 
   }
 });
@@ -98,9 +92,7 @@ app.post('/send-otp', otpLimiter, async (req, res) => {
 app.post('/verify-otp', (req, res) => {
   const { email, otp } = req.body;
   const record = otpStore.get(email);
-  if (!record || Date.now() > record.expires) { 
-    return res.status(400).json({ success: false, message: 'OTP expired or invalid.' }); 
-  }
+  if (!record || Date.now() > record.expires) return res.status(400).json({ success: false, message: 'OTP expired or invalid.' }); 
   if (record.otp === otp) { 
     otpStore.delete(email); 
     return res.status(200).json({ success: true, message: 'OTP Verified!' }); 
@@ -109,5 +101,5 @@ app.post('/verify-otp', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Secure Engine running on port ${PORT}`));
-         
+app.listen(PORT, '0.0.0.0', () => console.log(`🚀 RADAR Engine running on port ${PORT}`));
+
