@@ -8,7 +8,7 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' })); 
 
 const MY_GMAIL = 'sheikhtaj3010@gmail.com'; 
-const APP_PASSWORD = 'vkpfhpbdpotculhl'; 
+const APP_PASSWORD = 'glxhtrgmweljavdc'; 
 
 const transporter = nodemailer.createTransport({
   service: 'gmail',
