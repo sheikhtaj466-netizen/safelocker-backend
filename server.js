@@ -7,7 +7,7 @@ const rateLimit = require('express-rate-limit');
 
 const app = express();
 
-// 🛠️ FIX 1: Trust Render's Proxy (Ye Rate Limiter ko crash hone se rokenge)
+// 🛠️ Trust Render's Proxy
 app.set('trust proxy', 1); 
 
 // 📡 GLOBAL RADAR
@@ -30,16 +30,13 @@ const otpLimiter = rateLimit({
 const MY_GMAIL = process.env.EMAIL_USER; 
 const APP_PASSWORD = process.env.EMAIL_PASS; 
 
-// 🛠️ THE ULTIMATE FIX: Port 587 (STARTTLS) + Strict Timeouts
+// 🚀 THE MAGIC BULLET FIX: Purana raasta (IPv4) strict force kar rahe hain
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
-  port: 587,          // 465 hata kar 587 use kar rahe hain (Most reliable for cloud)
-  secure: false,      // 587 ke liye ye false hona zaroori hai
-  requireTLS: true,   // Security ke liye STARTTLS force karega
+  port: 465,
+  secure: true, 
   auth: { user: MY_GMAIL, pass: APP_PASSWORD },
-  connectionTimeout: 10000, // 10 second mein connect nahi hua toh fail ho jayega, hang nahi hoga
-  greetingTimeout: 10000,
-  socketTimeout: 10000
+  family: 4 // 🔥 Ye line Render ko IPv6 use karne se rokegi aur Timeout fix karegi!
 });
 
 app.get('/', (req, res) => { res.status(200).send('SafeLocker Ultra-Secure Engine is ALIVE! 🛡️🚀'); });
@@ -87,7 +84,7 @@ app.post('/send-otp', otpLimiter, async (req, res) => {
   const template = getEmailTemplateContent(otpType, otp);
   
   try {
-    console.log(`⏳ Sending email via Nodemailer (IPv4 Forced)...`);
+    console.log(`⏳ Sending email via Nodemailer (IPv4 Strictly Forced)...`);
     await transporter.sendMail({ from: `"SafeLocker Security" <${MY_GMAIL}>`, to: email, subject: template.subject, html: template.html });
     console.log(`✅ [SUCCESS] Email sent to: ${email}`);
     res.status(200).json({ success: true, message: 'OTP sent successfully!' });
