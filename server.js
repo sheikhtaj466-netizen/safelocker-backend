@@ -30,12 +30,16 @@ const otpLimiter = rateLimit({
 const MY_GMAIL = process.env.EMAIL_USER; 
 const APP_PASSWORD = process.env.EMAIL_PASS; 
 
-// 🛠️ FIX 2: Force IPv4 and SSL for Render (Ye Timeout ko rokega)
+// 🛠️ THE ULTIMATE FIX: Port 587 (STARTTLS) + Strict Timeouts
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
-  port: 465,
-  secure: true, // Use SSL
-  auth: { user: MY_GMAIL, pass: APP_PASSWORD }
+  port: 587,          // 465 hata kar 587 use kar rahe hain (Most reliable for cloud)
+  secure: false,      // 587 ke liye ye false hona zaroori hai
+  requireTLS: true,   // Security ke liye STARTTLS force karega
+  auth: { user: MY_GMAIL, pass: APP_PASSWORD },
+  connectionTimeout: 10000, // 10 second mein connect nahi hua toh fail ho jayega, hang nahi hoga
+  greetingTimeout: 10000,
+  socketTimeout: 10000
 });
 
 app.get('/', (req, res) => { res.status(200).send('SafeLocker Ultra-Secure Engine is ALIVE! 🛡️🚀'); });
