@@ -6,12 +6,12 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit'); 
 const dns = require('dns');
 
-// 🔥 VVIP FIX: Force Node to use IPv4 globally. Render's IPv6 messes with Google SMTP.
+// 🔥 DNS FIX: Force Node to prefer IPv4.
 dns.setDefaultResultOrder('ipv4first');
 
 const app = express();
 
-// 🔥 SENIOR TIP: Render load balancer use karta hai. Iske bina tera Rate Limiter har user ko same IP manega aur block kar dega.
+// 🔥 SENIOR TIP: Render load balancer use karta hai. Iske bina tera Rate Limiter fail ho jayega.
 app.set('trust proxy', 1); 
 
 app.use(helmet()); 
@@ -20,7 +20,7 @@ app.use(express.json({ limit: '50mb' }));
 
 const otpLimiter = rateLimit({
   windowMs: 5 * 60 * 1000, 
-  max: 5, // Thoda limit badha diya development ke liye
+  max: 5, 
   message: { success: false, message: "Too many OTP requests. Please try again after 5 minutes." },
   standardHeaders: true, 
   legacyHeaders: false, 
@@ -29,13 +29,14 @@ const otpLimiter = rateLimit({
 const MY_GMAIL = process.env.EMAIL_USER; 
 const APP_PASSWORD = process.env.EMAIL_PASS; 
 
-// 🔥 TRANSPORTER FIX: Enforce host/port explicitly aur self-signed certs bypass
+// 🔥 THE BULLETPROOF FIX: Port 465 (Direct SSL) + family: 4 (Strict IPv4)
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
-  port: 587,
-  secure: false, // true for 465, false for other ports
+  port: 465,
+  secure: true, // MUST be true for port 465
   auth: { user: MY_GMAIL, pass: APP_PASSWORD },
-  tls: { rejectUnauthorized: false } 
+  tls: { rejectUnauthorized: false }, 
+  family: 4 // This forces Nodemailer to strictly use IPv4, bypassing Render's IPv6 blocks
 });
 
 app.get('/', (req, res) => { res.status(200).send('SafeLocker Ultra-Secure Engine is ALIVE! 🛡️🚀'); });
@@ -95,7 +96,7 @@ app.post('/send-otp', otpLimiter, async (req, res) => {
   const template = getEmailTemplateContent(otpType, otp);
   
   try {
-    console.log(`⏳ [SENDING EMAIL] Connecting to Nodemailer...`);
+    console.log(`⏳ [SENDING EMAIL] Connecting to Nodemailer via IPv4...`);
     await transporter.sendMail({ from: `"SafeLocker Security" <${MY_GMAIL}>`, to: email, subject: template.subject, html: template.html });
     console.log(`✅ [SUCCESS] Email delivered successfully to: ${email}`);
     res.status(200).json({ success: true, message: 'OTP sent successfully!' });
